@@ -1,7 +1,7 @@
-﻿using System;
+﻿using ClosedXML.Excel;
+using System;
 using System.IO;
 using System.Reflection;
-using Excel = Microsoft.Office.Interop.Excel;
 
 namespace TreeToExcel
 {
@@ -25,63 +25,52 @@ namespace TreeToExcel
 
         static void ToExcel(string[] files)
         {
-            Excel.Application xlApp = new Excel.Application();
             try
             {
                 string excelPath = Path.Combine(assemblyPath, "伺服器應用程式及檔案異動清單(空白).xlsx");
-                //創建
-                //Excel.Application xlApp = new Excel.Application();
-                xlApp.DisplayAlerts = false;
-                xlApp.Visible = false;
-                xlApp.ScreenUpdating = false;
-
-                //打開Excel
-                Excel.Workbook xlsWorkBook = xlApp.Workbooks.Open(excelPath);
-
-                //處理數據過程
-                Excel.Worksheet sheet = xlsWorkBook.Worksheets[1];  //工作簿從1開始，不是0
-
-                int rowNow = 2;
-                Console.WriteLine("開始Excel處理");
-                for (int i = 0; i < files.Length; i++)
+                using (var wbook = new XLWorkbook(excelPath))
                 {
-                    if (rowNow != 2)
+                    var sheet = wbook.Worksheet(1);
+
+                    int rowNow = 2;
+                    Console.WriteLine("開始Excel處理");
+                    var row = sheet.Row(1);
+                    for (int i = 0; i < files.Length; i++)
                     {
-                        Excel.Range range = sheet.get_Range("A2", "G2").EntireRow;
-                        Excel.Range toRange = sheet.get_Range("A" + rowNow, "G" + rowNow).EntireRow;
-                        toRange.Insert(Excel.XlInsertShiftDirection.xlShiftDown, range.Copy(Type.Missing));
+                        row = sheet.Row(rowNow);
+
+                        string pathFileName = files[i].Replace(assemblyPath, string.Empty);
+                        int idx = pathFileName.LastIndexOf("\\");
+                        if (idx == 0)
+                            continue;
+                        string path = pathFileName.Substring(1, idx);
+                        string fileName = pathFileName.Replace(path, string.Empty).Replace("\\", string.Empty);
+
+                        row.Cell(2).Value = path;
+                        row.Cell(3).Value = fileName;
+                        row.Cell(5).Value = "是";
+
+                        row.Height = 20;
+                        rowNow++;
+                        row.InsertRowsBelow(1);
                     }
+                    row = sheet.Row(rowNow);
+                    row.Delete();
 
-                    string pathFileName = files[i].Replace(assemblyPath, string.Empty);
-                    int idx = pathFileName.LastIndexOf("\\");
-                    if (idx == 0)
-                        continue;
-                    string path = pathFileName.Substring(1, idx);
-                    string fileName = pathFileName.Replace(path, string.Empty).Replace("\\", string.Empty);
+                    rowNow--;
+                    sheet.Range("A2", "A" + rowNow).Merge();
+                    sheet.Range("G2", "G" + rowNow).Merge();
 
-                    sheet.Cells[rowNow, 2] = path;
-                    sheet.Cells[rowNow, 3] = fileName;
-
-                    rowNow++;
+                    sheet.Columns().AdjustToContents();  // Adjust column width
+                    //sheet.Rows().AdjustToContents();     // Adjust row heights
+                    wbook.SaveAs(Path.Combine(assemblyPath, "伺服器應用程式及檔案異動清單.xlsx"));
                 }
-
-                sheet.get_Range("A2", "A" + (rowNow - 1)).Merge();
-                sheet.get_Range("G2", "G" + (rowNow - 1)).Merge();
-
-                sheet.Columns.AutoFit();
-                sheet.Rows.AutoFit();
-
-                xlsWorkBook.SaveAs(Path.Combine(assemblyPath, "伺服器應用程式及檔案異動清單.xlsx"));
-
-                xlsWorkBook.Close();
-                xlApp.Quit();
 
                 Console.WriteLine("完成!!請按任意鍵繼續..");
                 Console.ReadKey();
             }
             catch (Exception e)
             {
-                xlApp.Quit();
                 Console.WriteLine(e.ToString());
                 Console.ReadKey();
             }
